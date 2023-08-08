@@ -179,7 +179,7 @@ const TableHelper = (() => {
 
 function createChanceElement$(chancePromise, player, opponent) {
     const $element = $('<div class="sim-result"></div>')
-        .html('P[W]:<br>-')
+        .html('<div class="label">P[W]:</div>-')
         .css('color', '#999')
         .attr('tooltip', createBattleTable());
     queueMicrotask(update);
@@ -188,7 +188,7 @@ function createChanceElement$(chancePromise, player, opponent) {
     async function update() {
         const chance = await chancePromise;
         $element
-            .html(`P[W]:<br>${toPercentage(chance)}`)
+            .html(`<div class="label">P[W]:</div>${toPercentage(chance)}`)
             .css('color', getRiskColor(chance));
     }
 
@@ -232,7 +232,7 @@ function createChanceElement$(chancePromise, player, opponent) {
 
 function createMojoElement$(chancePromise, winMojo) {
     const $element = $('<div class="sim-result"></div>')
-        .html('E[M]:<br>-')
+        .html('<div class="label">E[M]:</div>-')
         .css('color', '#999');
     queueMicrotask(update);
     return $element;
@@ -243,7 +243,7 @@ function createMojoElement$(chancePromise, winMojo) {
         const lossMojo = winMojo - 40;
         const odds = winMojo * winChance + lossMojo * lossChance;
         $element
-            .html(`E[M]:<br>${toRoundedNumber(odds, 100)}`)
+            .html(`<div class="label">E[M]:</div>${toRoundedNumber(odds, 100)}`)
             .css('color', getMojoColor(odds))
             .attr('tooltip', createMojoTable());
 
@@ -342,6 +342,9 @@ function addStyle() {
     text-align: center;
     text-shadow: -1px -1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000;
     z-index: 1;
+}
+.sim-result .label {
+    font-size: 0.75rem;
 }
 .sim-result.left {
     margin-right: 70%;
