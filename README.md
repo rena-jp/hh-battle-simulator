@@ -1,4 +1,4 @@
-# hh-battle-simulator
+# Hentai Heroes Battle Simulator
 
 ## Description
 This script adds a battle simulator to Hentai Heroes and related games. It supports girl skills.
