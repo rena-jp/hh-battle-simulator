@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.1
+// @version      2.2
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -47,10 +47,19 @@ const workerScript = (() => {
             attackerAttack *= attacker.attackMultiplier;
             defenderDefense *= attacker.defenseMultiplier;
             const baseDamage = Math.max(0, Math.floor(attackerAttack - defenderDefense));
-            const baseResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, baseDamage);
-            const critDamage = baseDamage * attacker.critMultiplier;
-            const critResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, critDamage);
-            return baseResult * attacker.baseHitChance + critResult * attacker.critHitChance;
+            if (attackerEgo / attacker.ego >= defenderEgo / defender.ego) {
+                const baseResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, baseDamage);
+                if (baseResult == attacker.win) return attacker.win;
+                const critDamage = baseDamage * attacker.critMultiplier;
+                const critResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, critDamage);
+                return baseResult * attacker.baseHitChance + critResult * attacker.critHitChance;
+            } else {
+                const critDamage = baseDamage * attacker.critMultiplier;
+                const critResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, critDamage);
+                if (critResult == 1 - attacker.win) return 1 - attacker.win;
+                const baseResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, baseDamage);
+                return baseResult * attacker.baseHitChance + critResult * attacker.critHitChance;
+            }
         }
 
         function hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, damage) {
