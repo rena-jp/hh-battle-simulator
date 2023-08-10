@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.4
+// @version      2.5
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -28,6 +28,16 @@ window.HHBattleSimulator = {
         const opponent = calcBattleData(opponentRawData, playerRawData);
         const preSim = checkChanceFromBattleData(player, opponent);
         return await calcChanceFromBattleData(player, opponent, preSim);
+    },
+    /**
+     * @param {*} playerRawData - hero_data
+     * @param {*} opponentRawData - opponent_fighter.player
+     * @returns {Promise<{ chance: number, point: number }>} - Player's winning chance and expected point
+     */
+    async calcChanceAndPoint(playerRawData, opponentRawData) {
+        const player = calcBattleData(playerRawData, opponentRawData);
+        const opponent = calcBattleData(opponentRawData, playerRawData);
+        return await calcChanceAndPointFromBattleData(player, opponent);
     },
 };
 
@@ -68,6 +78,33 @@ const workerScript = (() => {
             if (defenderEgo <= 0) return attacker.win;
             attackerEgo += Math.ceil(damage * attacker.healing);
             attackerEgo = Math.min(attackerEgo, attacker.ego);
+            return attack(defender, defenderEgo, defenderAttack, defenderDefense, attacker, attackerEgo, attackerAttack, attackerDefense);
+        }
+    }
+
+    function calcChanceAndPoint(player, opponent) {
+        player.win = ego => ({ chance: 1, point: Math.ceil(10 * ego / player.ego) + 15 });
+        opponent.win = ego => ({ chance: 0, point: Math.ceil(10 * (opponent.ego - ego) / (opponent.ego)) + 3 });
+        return attack(player, player.ego, player.attack, player.defense, opponent, opponent.ego, opponent.attack, opponent.defense);
+
+        function attack(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense) {
+            attackerAttack *= attacker.attackMultiplier;
+            defenderDefense *= attacker.defenseMultiplier;
+            const baseDamage = Math.max(0, Math.floor(attackerAttack - defenderDefense));
+            const baseResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, baseDamage);
+            const critDamage = baseDamage * attacker.critMultiplier;
+            const critResult = hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, critDamage);
+            return {
+                chance: baseResult.chance * attacker.baseHitChance + critResult.chance * attacker.critHitChance,
+                point: baseResult.point * attacker.baseHitChance + critResult.point * attacker.critHitChance
+            };
+        }
+
+        function hit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense, damage) {
+            defenderEgo -= Math.ceil(damage);
+            attackerEgo += Math.ceil(damage * attacker.healing);
+            attackerEgo = Math.min(attackerEgo, attacker.ego);
+            if (defenderEgo <= 0) return attacker.win(attackerEgo);
             return attack(defender, defenderEgo, defenderAttack, defenderDefense, attacker, attackerEgo, attackerAttack, attackerDefense);
         }
     }
@@ -119,6 +156,10 @@ async function calcChanceFromBattleData(player, opponent, preSim) {
     } else {
         return await workerRun('calcChance', [player, opponent]);
     }
+}
+
+async function calcChanceAndPointFromBattleData(player, opponent) {
+    return await workerRun('calcChanceAndPoint', [player, opponent]);
 }
 
 function checkChanceFromBattleData(player, opponent) {
@@ -336,6 +377,22 @@ function createMojoElement$(chancePromise, winMojo) {
     }
 }
 
+function createPointElement$(pointPromise) {
+    const $element = $('<div class="sim-result"></div>')
+        .addClass('pending')
+        .html('<div class="label">E[P]:</div>-');
+    queueMicrotask(update);
+    return $element;
+
+    async function update() {
+        const point = await pointPromise;
+        $element
+            .removeClass('pending')
+            .html(`<div class="label">E[P]:</div>${point.toFixed(2)}`)
+            .css('color', getRiskColor(point / 25));
+    }
+}
+
 (async function () {
     if (document.readyState === 'loading') {
         await new Promise(resolve => {
@@ -354,7 +411,7 @@ function createMojoElement$(chancePromise, winMojo) {
         $(() => { resolve(); });
     });
 
-    if (checkPage('/leagues-pre-battle.html', '/troll-pre-battle.html', '/pantheon-pre-battle.html')) {
+    if (checkPage('/troll-pre-battle.html', '/pantheon-pre-battle.html')) {
         const { hero_data, opponent_fighter } = window;
         if (!hero_data) throw new Error('hero_data not found.');
         if (!opponent_fighter) throw new Error('opponents not found.');
@@ -371,6 +428,27 @@ function createMojoElement$(chancePromise, winMojo) {
 
         $('.opponent .icon-area')
             .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('left'));
+    }
+
+    if (checkPage('/leagues-pre-battle.html')) {
+        const { hero_data, opponent_fighter } = window;
+        if (!hero_data) throw new Error('hero_data not found.');
+        if (!opponent_fighter) throw new Error('opponent_fighter not found.');
+        if (!opponent_fighter.player) throw new Error('opponent_fighter.player not found.');
+
+        const playerRawData = hero_data;
+        const opponentRawData = opponent_fighter.player;
+        const player = calcBattleData(playerRawData, opponentRawData);
+        const opponent = calcBattleData(opponentRawData, playerRawData);
+        const chanceAndPointPromise = calcChanceAndPointFromBattleData(player, opponent);
+        const chancePromise = chanceAndPointPromise.then(e => e.chance);
+        const pointPromise = chanceAndPointPromise.then(e => e.point);
+
+        await afterGameInited;
+
+        $('.opponent .icon-area')
+            .before(createChanceElement$(chancePromise, player, opponent, { }).addClass('left'))
+            .before(createPointElement$(pointPromise).addClass('right'));
     }
 
     if (checkPage('/season-arena.html')) {
