@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.2
+// @version      2.3
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -26,7 +26,8 @@ window.HHBattleSimulator = {
     async calcChance(playerRawData, opponentRawData) {
         const player = calcBattleData(playerRawData, opponentRawData);
         const opponent = calcBattleData(opponentRawData, playerRawData);
-        return await calcChanceFromBattleData(player, opponent);
+        const preSim = checkChanceFromBattleData(player, opponent);
+        return await calcChanceFromBattleData(player, opponent, preSim);
     },
 };
 
@@ -110,8 +111,62 @@ async function workerRun(func, args) {
     return promise;
 }
 
-async function calcChanceFromBattleData(player, opponent) {
-    return await workerRun('calcChance', [player, opponent]);
+async function calcChanceFromBattleData(player, opponent, preSim) {
+    if (preSim.alwaysWin) {
+        return 1;
+    } else if (preSim.neverWin) {
+        return 0;
+    } else {
+        return await workerRun('calcChance', [player, opponent]);
+    }
+}
+
+function checkChanceFromBattleData(player, opponent) {
+    const results = { alwaysWin: true, neverWin: true };
+    const newPlayer = { ...player, results: results };
+    const newOpponent = { ...opponent, results: { } };
+    normalHit(newPlayer, player.ego, player.attack, player.defense, newOpponent, opponent.ego, opponent.attack, opponent.defense);
+    criticalHit(newPlayer, player.ego, player.attack, player.defense, newOpponent, opponent.ego, opponent.attack, opponent.defense);
+    return results;
+
+    function normalHit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense) {
+        attackerAttack *= attacker.attackMultiplier;
+        defenderDefense *= attacker.defenseMultiplier;
+
+        const baseDamage = Math.max(0, Math.floor(attackerAttack - defenderDefense));
+        defenderEgo -= baseDamage;
+        if (defenderEgo <= 0) {
+            attacker.results.neverWin = false;
+            defender.results.alwaysWin = false;
+            return;
+        }
+
+        const normalHealing = Math.ceil(baseDamage * attacker.healing);
+        attackerEgo += normalHealing;
+        attackerEgo = Math.min(attackerEgo, attacker.ego);
+
+        criticalHit(defender, defenderEgo, defenderAttack, defenderDefense, attacker, attackerEgo, attackerAttack, attackerDefense);
+    }
+
+    function criticalHit(attacker, attackerEgo, attackerAttack, attackerDefense, defender, defenderEgo, defenderAttack, defenderDefense) {
+        attackerAttack *= attacker.attackMultiplier;
+        defenderDefense *= attacker.defenseMultiplier;
+
+        const baseDamage = Math.max(0, Math.floor(attackerAttack - defenderDefense));
+        const criticalDamage = Math.ceil(baseDamage * attacker.critMultiplier);
+        defenderEgo -= criticalDamage;
+        if (defenderEgo <= 0) {
+            attacker.results.neverWin = false;
+            defender.results.alwaysWin = false;
+            return;
+        }
+
+        const criticalHealing = Math.ceil(baseDamage * attacker.critMultiplier * attacker.healing);
+        attackerEgo += criticalHealing;
+        attackerEgo = Math.min(attackerEgo, attacker.ego);
+
+        normalHit(defender, defenderEgo, defenderAttack, defenderDefense, attacker, attackerEgo, attackerAttack, attackerDefense);
+    }
 }
 
 function calcBattleData(fighterRawData, opponentRawData) {
@@ -186,13 +241,24 @@ const TableHelper = (() => {
     return { column, columns, row };
 })();
 
-function createChanceElement$(chancePromise, player, opponent) {
-    const $element = $('<div class="sim-result"></div>')
-        .html('<div class="label">P[W]:</div>-')
-        .css('color', '#999')
+function createChanceElement$(chancePromise, player, opponent, preSim) {
+    const $element = $('<div class="sim-result"></div>');
+    if (preSim.alwaysWin) {
+        $element
+            .html(`<div class="label">P[W]:</div><div class="vCheck_mix_icn sim-mark"></div>${toPercentage(1)}`)
+            .css('color', getRiskColor(1));
+    } else if(preSim.neverWin) {
+        $element
+            .html(`<div class="label">P[W]:</div><div class="xUncheck_mix_icn sim-mark"></div>${toPercentage(0)}`)
+            .css('color', getRiskColor(0));
+    } else {
+        $element
+            .html('<div class="label">P[W]:</div>-')
+            .css('color', '#999');
+        queueMicrotask(update);
+    }
+    return $element
         .attr('tooltip', createBattleTable());
-    queueMicrotask(update);
-    return $element;
 
     async function update() {
         const chance = await chancePromise;
@@ -296,12 +362,13 @@ function createMojoElement$(chancePromise, winMojo) {
         const opponentRawData = opponent_fighter.player;
         const player = calcBattleData(playerRawData, opponentRawData);
         const opponent = calcBattleData(opponentRawData, playerRawData);
-        const chancePromise = calcChanceFromBattleData(player, opponent);
+        const preSim = checkChanceFromBattleData(player, opponent);
+        const chancePromise = calcChanceFromBattleData(player, opponent, preSim);
 
         await afterGameInited;
 
         $('.opponent .icon-area')
-            .before(createChanceElement$(chancePromise, player, opponent).addClass('left'));
+            .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('left'));
     }
 
     if (checkPage('/season-arena.html')) {
@@ -317,13 +384,14 @@ function createMojoElement$(chancePromise, winMojo) {
             const playerRawData = { ...hero_data, ...caracs_per_opponent[opponentId] };
             const player = calcBattleData(playerRawData, opponentRawData);
             const opponent = calcBattleData(opponentRawData, playerRawData);
-            const chancePromise = calcChanceFromBattleData(player, opponent);
+            const preSim = checkChanceFromBattleData(player, opponent);
+            const chancePromise = calcChanceFromBattleData(player, opponent, preSim);
             const mojo = +opponent_fighter.rewards.rewards.find(e => e.type === 'victory_points').value;
 
             await afterGameInited;
 
             $(`[data-opponent="${opponentId}"] .icon-area`)
-                .before(createChanceElement$(chancePromise, player, opponent).addClass('left'))
+                .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('left'))
                 .before(createMojoElement$(chancePromise, mojo).addClass('right'));
         });
     }
@@ -364,6 +432,14 @@ function addStyle() {
 .sim-result.top {
     bottom: 11.5rem;
     line-height: 1rem;
+}
+.sim-mark {
+    display: inline-block;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: -0.5rem 0.25rem 0 -1.5rem;
+    background-size: 1.5rem;
+    vertical-align: bottom;
 }
 table.sim-table {
     border-collapse: collapse;
