@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.3
+// @version      2.4
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -253,8 +253,8 @@ function createChanceElement$(chancePromise, player, opponent, preSim) {
             .css('color', getRiskColor(0));
     } else {
         $element
-            .html('<div class="label">P[W]:</div>-')
-            .css('color', '#999');
+            .addClass('pending')
+            .html('<div class="label">P[W]:</div>-');
         queueMicrotask(update);
     }
     return $element
@@ -263,6 +263,7 @@ function createChanceElement$(chancePromise, player, opponent, preSim) {
     async function update() {
         const chance = await chancePromise;
         $element
+            .removeClass('pending')
             .html(`<div class="label">P[W]:</div>${toPercentage(chance)}`)
             .css('color', getRiskColor(chance));
     }
@@ -307,8 +308,8 @@ function createChanceElement$(chancePromise, player, opponent, preSim) {
 
 function createMojoElement$(chancePromise, winMojo) {
     const $element = $('<div class="sim-result"></div>')
-        .html('<div class="label">E[M]:</div>-')
-        .css('color', '#999');
+        .addClass('pending')
+        .html('<div class="label">E[M]:</div>-');
     queueMicrotask(update);
     return $element;
 
@@ -318,6 +319,7 @@ function createMojoElement$(chancePromise, winMojo) {
         const lossMojo = winMojo - 40;
         const odds = winMojo * winChance + lossMojo * lossChance;
         $element
+            .removeClass('pending')
             .html(`<div class="label">E[M]:</div>${toRoundedNumber(odds, 100)}`)
             .css('color', getMojoColor(odds))
             .attr('tooltip', createMojoTable());
@@ -432,6 +434,9 @@ function addStyle() {
 .sim-result.top {
     bottom: 11.5rem;
     line-height: 1rem;
+}
+.sim-result.pending {
+    color: #999;
 }
 .sim-mark {
     display: inline-block;
