@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.5
+// @version      2.6
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -286,16 +286,16 @@ function createChanceElement$(chancePromise, player, opponent, preSim) {
     const $element = $('<div class="sim-result"></div>');
     if (preSim.alwaysWin) {
         $element
-            .html(`<div class="label">P[W]:</div><div class="vCheck_mix_icn sim-mark"></div>${toPercentage(1)}`)
+            .html(`<div class="sim-label">P[W]:</div><div class="vCheck_mix_icn sim-mark"></div><span class="sim-chance">${toPercentage(1)}</span>`)
             .css('color', getRiskColor(1));
     } else if(preSim.neverWin) {
         $element
-            .html(`<div class="label">P[W]:</div><div class="xUncheck_mix_icn sim-mark"></div>${toPercentage(0)}`)
+            .html(`<div class="sim-label">P[W]:</div><div class="xUncheck_mix_icn sim-mark"></div><span class="sim-chance">${toPercentage(0)}</span>`)
             .css('color', getRiskColor(0));
     } else {
         $element
-            .addClass('pending')
-            .html('<div class="label">P[W]:</div>-');
+            .addClass('sim-pending')
+            .html('<div class="sim-label">P[W]:</div>-');
         queueMicrotask(update);
     }
     return $element
@@ -304,8 +304,8 @@ function createChanceElement$(chancePromise, player, opponent, preSim) {
     async function update() {
         const chance = await chancePromise;
         $element
-            .removeClass('pending')
-            .html(`<div class="label">P[W]:</div>${toPercentage(chance)}`)
+            .removeClass('sim-pending')
+            .html(`<div class="sim-label">P[W]:</div><span class="sim-chance">${toPercentage(chance)}</span>`)
             .css('color', getRiskColor(chance));
     }
 
@@ -349,8 +349,8 @@ function createChanceElement$(chancePromise, player, opponent, preSim) {
 
 function createMojoElement$(chancePromise, winMojo) {
     const $element = $('<div class="sim-result"></div>')
-        .addClass('pending')
-        .html('<div class="label">E[M]:</div>-');
+        .addClass('sim-pending')
+        .html('<div class="sim-label">E[M]:</div>-');
     queueMicrotask(update);
     return $element;
 
@@ -360,8 +360,8 @@ function createMojoElement$(chancePromise, winMojo) {
         const lossMojo = winMojo - 40;
         const odds = winMojo * winChance + lossMojo * lossChance;
         $element
-            .removeClass('pending')
-            .html(`<div class="label">E[M]:</div>${toRoundedNumber(odds, 100)}`)
+            .removeClass('sim-pending')
+            .html(`<div class="sim-label">E[M]:</div><span class="sim-mojo">${toRoundedNumber(odds, 100)}</span>`)
             .css('color', getMojoColor(odds))
             .attr('tooltip', createMojoTable());
 
@@ -379,16 +379,16 @@ function createMojoElement$(chancePromise, winMojo) {
 
 function createPointElement$(pointPromise) {
     const $element = $('<div class="sim-result"></div>')
-        .addClass('pending')
-        .html('<div class="label">E[P]:</div>-');
+        .addClass('sim-pending')
+        .html('<div class="sim-label">E[P]:</div>-');
     queueMicrotask(update);
     return $element;
 
     async function update() {
         const point = await pointPromise;
         $element
-            .removeClass('pending')
-            .html(`<div class="label">E[P]:</div>${point.toFixed(2)}`)
+            .removeClass('sim-pending')
+            .html(`<div class="sim-label">E[P]:</div><span class="sim-point">${point.toFixed(2)}</span>`)
             .css('color', getRiskColor(point / 25));
     }
 }
@@ -427,7 +427,7 @@ function createPointElement$(pointPromise) {
         await afterGameInited;
 
         $('.opponent .icon-area')
-            .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('left'));
+            .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('sim-left'));
     }
 
     if (checkPage('/leagues-pre-battle.html')) {
@@ -447,8 +447,8 @@ function createPointElement$(pointPromise) {
         await afterGameInited;
 
         $('.opponent .icon-area')
-            .before(createChanceElement$(chancePromise, player, opponent, { }).addClass('left'))
-            .before(createPointElement$(pointPromise).addClass('right'));
+            .before(createChanceElement$(chancePromise, player, opponent, { }).addClass('sim-left'))
+            .before(createPointElement$(pointPromise).addClass('sim-right'));
     }
 
     if (checkPage('/season-arena.html')) {
@@ -471,14 +471,14 @@ function createPointElement$(pointPromise) {
             await afterGameInited;
 
             $(`[data-opponent="${opponentId}"] .icon-area`)
-                .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('left'))
-                .before(createMojoElement$(chancePromise, mojo).addClass('right'));
+                .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('sim-left'))
+                .before(createMojoElement$(chancePromise, mojo).addClass('sim-right'));
         });
     }
 
     const avoidOverlap = () => {
         if ($('.matchRating').length > 0) {
-            $('.sim-result').addClass('top');
+            $('.sim-result').addClass('sim-top');
         }
     };
     avoidOverlap();
@@ -500,20 +500,20 @@ function addStyle() {
     text-shadow: -1px -1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000;
     z-index: 1;
 }
-.sim-result .label {
+.sim-result .sim-label {
     font-size: 0.75rem;
 }
-.sim-result.left {
+.sim-result.sim-left {
     margin-right: 70%;
 }
-.sim-result.right {
+.sim-result.sim-right {
     margin-left: 70%;
 }
-.sim-result.top {
+.sim-result.sim-top {
     bottom: 11.5rem;
     line-height: 1rem;
 }
-.sim-result.pending {
+.sim-result.sim-pending {
     color: #999;
 }
 .sim-mark {
