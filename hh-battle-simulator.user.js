@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.7
+// @version      2.8
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -388,7 +388,7 @@ function createPointElement$(pointPromise) {
         const point = await pointPromise;
         $element
             .removeClass('sim-pending')
-            .html(`<div class="sim-label">E[P]:</div><span class="sim-point">${point.toFixed(2)}</span>`)
+            .html(`<div class="sim-label">E[P]:</div><span class="sim-point">${toRoundedNumber(point, 100)}</span>`)
             .css('color', getRiskColor(point / 25));
     }
 }
