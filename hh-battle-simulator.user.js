@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.6
+// @version      2.7
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -504,10 +504,10 @@ function addStyle() {
     font-size: 0.75rem;
 }
 .sim-result.sim-left {
-    margin-right: 70%;
+    margin-right: 60%;
 }
 .sim-result.sim-right {
-    margin-left: 70%;
+    margin-left: 60%;
 }
 .sim-result.sim-top {
     bottom: 11.5rem;
