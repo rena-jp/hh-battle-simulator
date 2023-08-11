@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.9
+// @version      2.10
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -250,6 +250,36 @@ function calcBattleData(fighterRawData, opponentRawData) {
     };
 }
 
+function calcBattleDataFromTeamData(fighterTeam, opponentTeam) {
+    const checklist = [ 'fire', 'nature', 'stone', 'sun', 'water' ];
+    let damageMultiplier = 1;
+    let egoMultiplier = 1;
+    fighterTeam.theme_elements.forEach(e => {
+        if (opponentTeam.theme.includes(e.domination) && checklist.includes(e.domination)) {
+            damageMultiplier += 0.1;
+            egoMultiplier += 0.1;
+        }
+    });
+    const opponentSynergyBonuses = Object.fromEntries(
+        opponentTeam.synergies.map(e => [e.element.type, e.bonus_multiplier])
+    );
+    const defenseDecreasing = opponentSynergyBonuses.sun;
+    const caracs = fighterTeam.caracs;
+    return calcBattleData(
+        {
+            damage: Math.ceil(caracs.damage * damageMultiplier),
+            defense: caracs.defense - Math.ceil(caracs.defense * defenseDecreasing),
+            remaining_ego: Math.ceil(caracs.ego * egoMultiplier),
+            chance: caracs.chance,
+            team: fighterTeam,
+        },
+        {
+            chance: opponentTeam.caracs.chance,
+            team: opponentTeam,
+        }
+    );
+}
+
 function checkPage(...args) {
     return args.some(e => window.location.pathname.includes(e));
 }
@@ -412,6 +442,10 @@ function createPointElement$(pointPromise) {
 
     if (!window.$) throw new Error('jQuery not found.');
     /* global $ */
+    if (typeof localStorageGetItem !== 'function') throw new Error('localStorageGetItem not found');
+    /* global localStorageGetItem */
+    if (typeof localStorageSetItem !== 'function') throw new Error('localStorageSetItem not found');
+    /* global localStorageSetItem */
 
     addStyle();
 
@@ -482,6 +516,103 @@ function createPointElement$(pointPromise) {
                 .before(createChanceElement$(chancePromise, player, opponent, preSim).addClass('sim-left'))
                 .before(createMojoElement$(chancePromise, mojo).addClass('sim-right'));
         });
+    }
+
+    if (checkPage('/teams.html')) {
+        (async () => {
+            const battleType = localStorageGetItem('battle_type');
+            if (!['leagues','trolls','pantheon'].includes(battleType)) return;
+
+            const lastOpponentTeam = localStorageGetItem('HHBattleSimulatorLastOpponentTeam');
+            if (lastOpponentTeam == null) return;
+
+            const teams = window.teams_data;
+            if (teams == null) return;
+            const opponentTeamData = JSON.parse(lastOpponentTeam);
+            const teamMap = Object.fromEntries(
+                Object.values(teams).filter(e => e.id_team != null && !e.locked).map(e => {
+                    const playerTeamData = e;
+                    const player = calcBattleDataFromTeamData(playerTeamData, opponentTeamData);
+                    const opponent = calcBattleDataFromTeamData(opponentTeamData, playerTeamData);
+                    if (battleType === 'leagues') {
+                        const chanceAndPointPromise = calcChanceAndPointFromBattleData(player, opponent);
+                        return [ e.id_team, {
+                            player,
+                            opponent,
+                            chancePromise: chanceAndPointPromise.then(e => e.chance),
+                            pointPromise: chanceAndPointPromise.then(e => e.point),
+                        }];
+                    } else {
+                        const preSim = checkChanceFromBattleData(player, opponent);
+                        const chancePromise = calcChanceFromBattleData(player, opponent, preSim);
+                        return [ e.id_team, {
+                            player,
+                            opponent,
+                            chancePromise,
+                        }];
+                    }
+                })
+            );
+
+            await afterGameInited;
+
+            update();
+
+            const teamSelector = document.querySelector('.teams-grid-container');
+            if (teamSelector == null) return;
+
+            const observer = new MutationObserver(update);
+            observer.observe(teamSelector, {
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class'],
+            });
+
+            function update() {
+                const id = $('.selected-team').data('idTeam');
+                const team = teamMap[id];
+                if (team == null) return;
+                const { player, opponent, chancePromise, pointPromise } = team;
+                const $iconArea = $('.team-right-part-container .icon-area')
+                    .before(createChanceElement$(chancePromise, player, opponent, { }).addClass('sim-left'));
+                console.log(pointPromise);
+                if (pointPromise != null) {
+                    $iconArea
+                        .before(createPointElement$(pointPromise).addClass('sim-right'));
+                }
+            }
+        })();
+    }
+
+    if (checkPage('/leagues-pre-battle.html', '/troll-pre-battle.html', '/pantheon-pre-battle.html')) {
+        (async () => {
+            const id = location.search.match(/id_opponent=(\d+)/)?.[1];
+            if (id == null) return;
+            const {opponent_fighter} = window;
+            if (opponent_fighter == null) return;
+            const opponentTeam = opponent_fighter?.player?.team;
+            if (opponentTeam == null) return;
+            await afterGameInited;
+            const beforeChangeTeam = new Promise(resolve => {
+                document.getElementById('change_team')?.addEventListener('click', () => {
+                    resolve();
+                }, true);
+            });
+            await beforeChangeTeam;
+            localStorageSetItem('HHBattleSimulatorLastOpponentTeam', JSON.stringify(opponentTeam));
+            if (checkPage('/leagues-pre-battle.html')) {
+                localStorageSetItem('battle_type', 'leagues');
+                localStorageSetItem('leagues_id', id);
+            }
+            if (checkPage('/troll-pre-battle.html')) {
+                localStorageSetItem('battle_type', 'trolls');
+                localStorageSetItem('troll_id', id);
+            }
+            if (checkPage('/pantheon-pre-battle.html')) {
+                localStorageSetItem('battle_type', 'pantheon');
+                localStorageSetItem('pantheon_id', id);
+            }
+        })();
     }
 
     const avoidOverlap = () => {
