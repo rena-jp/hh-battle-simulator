@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hentai Heroes Battle Simulator
 // @namespace    https://github.com/rena-jp/hh-battle-simulator
-// @version      2.8
+// @version      2.9
 // @description  Add a battle simulator to Hentai Heroes and related games
 // @author       rena
 // @match        https://*.hentaiheroes.com/*
@@ -113,23 +113,31 @@ const workerScript = (() => {
 const workerBlob = new Blob([workerScript], { type: 'text/javascript' });
 const workerURL = URL.createObjectURL(workerBlob);
 const maxWorkers = navigator?.hardwareConcurrency ?? 1;
+const minWorkers = 1;
 let runningWorkers = 0;
 const waiterQueue = [];
+const workerPool = [];
 
 async function getWorker() {
-    if (runningWorkers < maxWorkers) {
+    const worker = workerPool.pop();
+    if (worker != null) {
+        return worker;
+    } else if (runningWorkers < maxWorkers) {
         runningWorkers++;
         return new Worker(workerURL);
+    } else {
+        return new Promise(resolve => {
+            waiterQueue.push(resolve);
+        });
     }
-    return new Promise(resolve => {
-        waiterQueue.push(resolve);
-    });
 }
 
 function releaseWorker(worker) {
     const waiter = waiterQueue.shift();
     if (waiter != null) {
         waiter(worker);
+    } else if (workerPool.length < minWorkers) {
+        workerPool.push(worker);
     } else {
         worker.terminate();
         runningWorkers--;
