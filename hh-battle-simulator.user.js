@@ -173,7 +173,7 @@ async function calcChanceAndPointFromBattleData(player, opponent) {
 function checkChanceFromBattleData(player, opponent) {
     const results = { alwaysWin: true, neverWin: true };
     const newPlayer = { ...player, results: results };
-    const newOpponent = { ...opponent, results: { } };
+    const newOpponent = { ...opponent, results: {} };
     normalHit(newPlayer, player.ego, player.attack, player.defense, newOpponent, opponent.ego, opponent.attack, opponent.defense);
     criticalHit(newPlayer, player.ego, player.attack, player.defense, newOpponent, opponent.ego, opponent.attack, opponent.defense);
     return results;
@@ -251,7 +251,7 @@ function calcBattleData(fighterRawData, opponentRawData) {
 }
 
 function calcBattleDataFromTeamData(fighterTeam, opponentTeam) {
-    const checklist = [ 'fire', 'nature', 'stone', 'sun', 'water' ];
+    const checklist = ['fire', 'nature', 'stone', 'sun', 'water'];
     let damageMultiplier = 1;
     let egoMultiplier = 1;
     fighterTeam.theme_elements.forEach(e => {
@@ -326,7 +326,7 @@ function createChanceElement$(chancePromise, player, opponent, preSim) {
         $element
             .html(`<div class="sim-label">P[W]:</div><div class="vCheck_mix_icn sim-mark"></div><span class="sim-chance">${toPercentage(1)}</span>`)
             .css('color', getRiskColor(1));
-    } else if(preSim.neverWin) {
+    } else if (preSim.neverWin) {
         $element
             .html(`<div class="sim-label">P[W]:</div><div class="xUncheck_mix_icn sim-mark"></div><span class="sim-chance">${toPercentage(0)}</span>`)
             .css('color', getRiskColor(0));
@@ -489,7 +489,7 @@ function createPointElement$(pointPromise) {
         await afterGameInited;
 
         $('.opponent .icon-area')
-            .before(createChanceElement$(chancePromise, player, opponent, { }).addClass('sim-left'))
+            .before(createChanceElement$(chancePromise, player, opponent, {}).addClass('sim-left'))
             .before(createPointElement$(pointPromise).addClass('sim-right'));
     }
 
@@ -521,7 +521,7 @@ function createPointElement$(pointPromise) {
     if (checkPage('/teams.html')) {
         (async () => {
             const battleType = localStorageGetItem('battle_type');
-            if (!['leagues','trolls','pantheon'].includes(battleType)) return;
+            if (!['leagues', 'trolls', 'pantheon'].includes(battleType)) return;
 
             const lastOpponentTeam = localStorageGetItem('HHBattleSimulatorLastOpponentTeam');
             if (lastOpponentTeam == null) return;
@@ -536,7 +536,7 @@ function createPointElement$(pointPromise) {
                     const opponent = calcBattleDataFromTeamData(opponentTeamData, playerTeamData);
                     if (battleType === 'leagues') {
                         const chanceAndPointPromise = calcChanceAndPointFromBattleData(player, opponent);
-                        return [ e.id_team, {
+                        return [e.id_team, {
                             player,
                             opponent,
                             chancePromise: chanceAndPointPromise.then(e => e.chance),
@@ -545,7 +545,7 @@ function createPointElement$(pointPromise) {
                     } else {
                         const preSim = checkChanceFromBattleData(player, opponent);
                         const chancePromise = calcChanceFromBattleData(player, opponent, preSim);
-                        return [ e.id_team, {
+                        return [e.id_team, {
                             player,
                             opponent,
                             chancePromise,
@@ -574,7 +574,7 @@ function createPointElement$(pointPromise) {
                 if (team == null) return;
                 const { player, opponent, chancePromise, pointPromise } = team;
                 const $iconArea = $('.team-right-part-container .icon-area')
-                    .before(createChanceElement$(chancePromise, player, opponent, { }).addClass('sim-left'));
+                    .before(createChanceElement$(chancePromise, player, opponent, {}).addClass('sim-left'));
                 if (pointPromise != null) {
                     $iconArea
                         .before(createPointElement$(pointPromise).addClass('sim-right'));
@@ -587,7 +587,7 @@ function createPointElement$(pointPromise) {
         (async () => {
             const id = location.search.match(/id_opponent=(\d+)/)?.[1];
             if (id == null) return;
-            const {opponent_fighter} = window;
+            const { opponent_fighter } = window;
             if (opponent_fighter == null) return;
             const opponentTeam = opponent_fighter?.player?.team;
             if (opponentTeam == null) return;
