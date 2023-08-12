@@ -575,7 +575,6 @@ function createPointElement$(pointPromise) {
                 const { player, opponent, chancePromise, pointPromise } = team;
                 const $iconArea = $('.team-right-part-container .icon-area')
                     .before(createChanceElement$(chancePromise, player, opponent, { }).addClass('sim-left'));
-                console.log(pointPromise);
                 if (pointPromise != null) {
                     $iconArea
                         .before(createPointElement$(pointPromise).addClass('sim-right'));
